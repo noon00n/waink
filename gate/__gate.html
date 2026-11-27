@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#100f1f" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>WAiNK</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png?v=4" />
+  <link rel="icon" type="image/svg+xml" href="/icons/waink-logo.svg?v=4" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=4" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: linear-gradient(165deg, #17122b 0%, #0d0c18 55%, #1d102b 100%);
+      color: #f8fafc;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    form {
+      width: 100%; max-width: 340px;
+      background: rgba(35, 27, 61, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      padding: 28px 22px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+      text-align: center;
+    }
+    .logo { width: 84px; height: 84px; display: block; margin: 0 auto; filter: drop-shadow(0 0 18px rgba(0, 212, 255, 0.35)); }
+    h1 { font-size: 20px; font-weight: 900; margin: 12px 0 4px; letter-spacing: 0.02em; }
+    p { font-size: 13px; color: #94a3b8; margin: 0 0 18px; }
+    input {
+      width: 100%; padding: 14px; font-size: 18px; text-align: center;
+      color: #fff; background: #0f0d1c; border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px; outline: none;
+    }
+    input:focus { border-color: #22d3ee; }
+    button {
+      width: 100%; margin-top: 12px; padding: 14px; border: 0; border-radius: 14px;
+      font-size: 14px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #fff;
+      background: linear-gradient(90deg, #06b6d4, #9333ea, #ec4899); cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; }
+    #msg { min-height: 18px; margin-top: 12px; font-size: 13px; color: #fda4af; }
+  </style>
+</head>
+<body>
+  <form id="f" autocomplete="on">
+    <img class="logo" src="/icons/waink-logo.svg?v=4" alt="WAiNK" />
+    <h1>WAiNK</h1>
+    <p>Enter the passcode. You'll only need it once on this device.</p>
+    <!-- Plain text box with a non-password name so browsers don't auto-fill an old saved password -->
+    <input id="code" name="wk-passcode" type="text" inputmode="text" autocomplete="off" data-lpignore="true" data-1p-ignore autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Passcode" required autofocus />
+    <button id="go" type="submit">Enter</button>
+    <div id="msg" role="status"></div>
+  </form>
+  <script>
+    const f = document.getElementById('f');
+    const code = document.getElementById('code');
+    const go = document.getElementById('go');
+    const msg = document.getElementById('msg');
+    code.value = '';
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      go.disabled = true;
+      msg.textContent = '';
+      try {
+        const res = await fetch('/__login', {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'X-Passcode': code.value.normalize('NFKC').replace(/[^A-Za-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim() }
+        });
+        if (res.status === 204) { location.replace('/'); return; }
+        msg.textContent = res.status === 429 ? 'Too many tries. Wait a minute and try again.' : 'Wrong passcode.';
+        code.select();
+      } catch (_) {
+        msg.textContent = 'Could not connect. Check your internet and try again.';
+      }
+      go.disabled = false;
+    });
+  </script>
+</body>
+</html>

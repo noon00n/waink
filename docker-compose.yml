@@ -1,0 +1,16 @@
+# Serves the app on port 30606 (same as the CasaOS "waink" app).
+# The passcode gate (scripts/install-gate.sh) sits in front of it on 127.0.0.1:30607,
+# and the Cloudflare tunnel points at the gate.
+name: waink
+services:
+  waink:
+    image: nginx:alpine
+    container_name: waink
+    restart: unless-stopped
+    ports:
+      - "30606:80"
+    volumes:
+      - type: bind
+        source: /DATA/AppData/waink/html
+        target: /usr/share/nginx/html
+        read_only: true

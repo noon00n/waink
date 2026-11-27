@@ -1,0 +1,13 @@
+# Copy to /etc/cloudflared/config.yml on the server and fill in.
+# Create the tunnel with:  cloudflared tunnel login && cloudflared tunnel create waink
+# Route DNS with:          cloudflared tunnel route dns waink your-domain.com
+#                          cloudflared tunnel route dns waink www.your-domain.com
+tunnel: <TUNNEL-ID>
+credentials-file: /etc/cloudflared/<TUNNEL-ID>.json
+ingress:
+  # Only the passcode gate is exposed - nothing else on the server
+  - hostname: your-domain.com
+    service: http://127.0.0.1:30607
+  - hostname: www.your-domain.com
+    service: http://127.0.0.1:30607
+  - service: http_status:404

@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#100f1f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="WAiNK" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png?v=4" />
+  <link rel="icon" type="image/svg+xml" href="/icons/waink-logo.svg?v=4" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=4" />
+  <link id="pwa-manifest" rel="manifest" href="" />
+  <title>WAiNK</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,500;0,700;0,900;1,900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #100f1f linear-gradient(165deg, #17122b 0%, #0d0c18 55%, #1d102b 100%) no-repeat;
+      background-attachment: fixed;
+      color: #f8fafc;
+      min-height: 100vh;
+      margin: 0;
+      /* safe-area padding is set in the "Phones & PC" section below */
+    }
+    @keyframes logoPulse {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 18px rgba(0, 212, 255, 0.35)); }
+      50% { transform: scale(1.04); filter: drop-shadow(0 0 28px rgba(236, 32, 185, 0.55)); }
+    }
+    .waink-logo-glow { animation: logoPulse 2.6s ease-in-out infinite; }
+    .seg-bar {
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(236, 32, 185, 0.95) 0px,
+        rgba(236, 32, 185, 0.95) 8px,
+        transparent 8px,
+        transparent 12px
+      );
+      box-shadow: 0 0 18px rgba(236, 32, 185, 0.75);
+    }
+
+    /* ---------- Live viewfinder ---------- */
+    .vf { aspect-ratio: 4 / 3; }
+    .vf-video, .vf-still { opacity: 0; transition: opacity .35s ease; }
+    .vf.live .vf-video { opacity: 1; }
+    .vf.has-still .vf-still { opacity: 1; }
+    .vf.has-still .vf-video { opacity: 0; }
+    .vf-shade {
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%);
+      opacity: 0; transition: opacity .35s;
+    }
+    .vf.live .vf-shade, .vf.has-still .vf-shade { opacity: 1; }
+
+    /* Crosshair: small white WAiNK starburst inside four white brackets (no lines) */
+    .vf-reticle {
+      width: clamp(2.25rem, 11%, 3.25rem); aspect-ratio: 1;
+      transform: translate(-50%, -50%); transition: transform .25s ease, opacity .3s;
+      filter: drop-shadow(0 0 2px rgba(0,0,0,.75)) drop-shadow(0 1px 6px rgba(0,0,0,.45));
+    }
+    .vf:not(.live):not(.has-still) .vf-reticle { opacity: 0; }
+    .vf-corner { position: absolute; width: 28%; height: 28%; border: 0 solid #fff; transition: border-color .2s; }
+    .vf-c-tl { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 3px; }
+    .vf-c-tr { top: 0; right: 0; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 3px; }
+    .vf-c-bl { bottom: 0; left: 0; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 3px; }
+    .vf-c-br { bottom: 0; right: 0; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 3px; }
+    .vf-mark { position: absolute; left: 50%; top: 50%; width: 50%; height: 50%; transform: translate(-50%, -50%); }
+    .vf-mark g { fill: #fff; transition: fill .2s; }
+    .vf.locked .vf-corner { border-color: #34d399; }
+    .vf.scanning .vf-corner { border-color: #67e8f9; }
+    .vf.scanning .vf-reticle { animation: reticlePulse .5s ease-in-out infinite alternate; }
+    @keyframes reticlePulse { from { transform: translate(-50%, -50%) scale(1); } to { transform: translate(-50%, -50%) scale(.88); } }
+    .vf.scanning .vf-mark { animation: markSpin 1.1s linear infinite; }
+    @keyframes markSpin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+    /* Camera off: show the app logo */
+    .vf-offlogo { width: 4.5rem; height: 4.5rem; filter: drop-shadow(0 6px 20px rgba(0,0,0,.5)); }
+
+    /* Scanning sweep across the whole view */
+    .vf-scanline {
+      left: 6%; right: 6%; top: 0; height: 3px; display: none; border-radius: 2px;
+      background: linear-gradient(90deg, transparent, #22d3ee 20%, #c396ff 50%, #ec4899 80%, transparent);
+      box-shadow: 0 0 14px 3px rgba(34,211,238,.55), 0 0 28px 6px rgba(236,72,153,.35);
+    }
+    .vf.scanning .vf-scanline { display: block; animation: sweep 1.05s ease-in-out infinite alternate; }
+    @keyframes sweep { from { top: 6%; } to { top: 93%; } }
+
+    /* Lock-on box */
+    .vf-bbox {
+      display: none; border: 2px solid #34d399; border-radius: 6px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 16px rgba(52,211,153,.45);
+      transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease;
+    }
+    .vf.locked .vf-bbox { display: block; }
+    .vf-bbox span {
+      position: absolute; left: -2px; top: -20px; padding: 1px 6px; border-radius: 4px 4px 4px 0;
+      background: #34d399; color: #052e1f; font: 700 10px/16px ui-monospace, monospace; letter-spacing: .04em; white-space: nowrap;
+    }
+
+    /* HUD */
+    .vf-hud { opacity: 0; transition: opacity .3s; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+    .vf.live .vf-hud, .vf.has-still .vf-hud { opacity: 1; }
+    .vf-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff2e63; box-shadow: 0 0 8px #ff2e63; animation: blink 1.2s steps(2, start) infinite; }
+    .vf.has-still .vf-live-dot { animation: none; background: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
+    @keyframes blink { to { visibility: hidden; } }
+    .vf-phase { color: #67e8f9; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+    .vf.live .vf-placeholder, .vf.has-still .vf-placeholder { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .vf.scanning .vf-scanline, .vf.scanning .vf-mark, .vf.scanning .vf-reticle, .waink-logo-glow { animation: none; }
+    }
+
+    /* ---------- Phones & PC ---------- */
+    /* Dark behind the page, so pulling past the top/bottom never shows white bars */
+    html {
+      -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+      background-color: #100f1f;
+      overscroll-behavior: none;
+    }
+    body {
+      min-height: 100dvh;
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+      /* Keep clear of the Dynamic Island / notch and home bar (needs !important: utility classes load later) */
+      padding-top: max(0.75rem, calc(env(safe-area-inset-top) + 0.625rem)) !important;
+      padding-bottom: max(0.75rem, calc(env(safe-area-inset-bottom) + 0.5rem)) !important;
+      padding-left: max(0.5rem, calc(env(safe-area-inset-left) + 0.25rem)) !important;
+      padding-right: max(0.5rem, calc(env(safe-area-inset-right) + 0.25rem)) !important;
+    }
+    @media (min-width: 640px) {
+      body {
+        padding-top: max(1.25rem, calc(env(safe-area-inset-top) + 0.75rem)) !important;
+        padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + 0.75rem)) !important;
+        padding-left: max(1.25rem, env(safe-area-inset-left)) !important;
+        padding-right: max(1.25rem, env(safe-area-inset-right)) !important;
+      }
+    }
+    /* Settings pop-up also stays clear of the island */
+    #settings-modal { padding-top: max(1rem, calc(env(safe-area-inset-top) + 0.5rem)) !important; padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important; }
+    button, a, input, label { touch-action: manipulation; }
+    /* Hold-to-scan: no text selection, magnifier or "copy/share" menu on long press */
+    #btn-scan, #viewfinder, .scan-wrap {
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    }
+    #history-list, #scan-results { -webkit-user-select: text; user-select: text; }
+    .desk-only { display: none; }
+
+    /* Scan details pop-up: bottom sheet on phones, centered window on PC. Camera stays off while it's open. */
+    #details-sheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+    #details-sheet.hidden { display: none; }
+    #details-sheet .ds-backdrop { position: absolute; inset: 0; background: rgba(5, 4, 12, .72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: dsFade .2s ease-out; }
+    #details-sheet .ds-panel {
+      position: relative; width: 100%; max-width: 30rem; max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - .5rem);
+      display: flex; flex-direction: column;
+      background: linear-gradient(180deg, #1d1733 0%, #120f22 100%);
+      border: 1px solid rgba(255,255,255,.14); border-bottom: 0; border-radius: 1.5rem 1.5rem 0 0;
+      box-shadow: 0 -20px 60px rgba(0,0,0,.6);
+      padding-bottom: max(.75rem, env(safe-area-inset-bottom));
+      animation: dsUp .26s cubic-bezier(.2,.8,.2,1);
+    }
+    #details-sheet .ds-grab { width: 40px; height: 4px; border-radius: 9999px; background: rgba(255,255,255,.25); margin: 8px auto 0; }
+    #details-sheet .ds-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: .5rem 1rem 0; }
+    #details-sheet #scan-results { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; }
+    @keyframes dsUp { from { transform: translateY(100%); } to { transform: none; } }
+    @keyframes dsFade { from { opacity: 0; } to { opacity: 1; } }
+    @media (min-width: 640px) {
+      #details-sheet { align-items: center; padding: 1.5rem; }
+      #details-sheet .ds-panel { border-bottom: 1px solid rgba(255,255,255,.14); border-radius: 1.5rem; max-height: 88vh; animation: dsPop .2s ease-out; }
+      #details-sheet .ds-grab { display: none; }
+    }
+    @keyframes dsPop { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { #details-sheet .ds-panel, #details-sheet .ds-backdrop { animation: none; } }
+    html.sheet-open, html.sheet-open body { overflow: hidden; }
+
+    /* Swipe between Scanner and History (phones) */
+    .swipe-dots { display: none; }
+    .swipe-dot { width: 7px; height: 7px; border-radius: 9999px; background: rgba(255,255,255,.28); transition: all .2s; }
+    .swipe-dot.on { width: 18px; background: linear-gradient(90deg, #22d3ee, #ec4899); }
+    #scanner-card { touch-action: pan-y; }
+    .slide-from-right { animation: slideFromRight .24s ease-out; }
+    .slide-from-left { animation: slideFromLeft .24s ease-out; }
+    @keyframes slideFromRight { from { transform: translateX(22%); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes slideFromLeft { from { transform: translateX(-22%); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .slide-from-right, .slide-from-left { animation: none; } }
+
+    /* Phones: start at the top, taller camera window that still leaves room for the button */
+    @media (max-width: 1023px) {
+      body { justify-content: flex-start !important; }
+      /* The card always reaches the bottom of the screen */
+      main.app-grid { flex: 1 0 auto; }
+      #scanner-card { flex: 1 0 auto; display: flex; flex-direction: column; }
+      .vf { aspect-ratio: 4 / 5; max-height: 56dvh; width: 100%; }
+      /* 16px inputs stop iPhone from zooming in when you tap a field */
+      input, select, textarea { font-size: 16px !important; }
+      #panel-history { max-height: 62dvh !important; }
+    }
+    /* Landscape phones: keep the camera window short enough to see the button */
+    @media (max-width: 1023px) and (orientation: landscape) {
+      .vf { aspect-ratio: 16 / 9; max-height: 50dvh; }
+    }
+
+    /* PC: one centered scanner card; details open in the pop-up */
+    @media (min-width: 1024px) {
+      main.app-grid { max-width: 30rem !important; }
+      #panel-history { max-height: 70vh !important; }
+      .vf { max-height: 60vh; }
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .desk-only { display: block; }
+    }
+  </style>
+</head>
+<body class="w-full min-h-screen flex flex-col items-center justify-center p-2 sm:p-5 antialiased selection:bg-pink-500/30">
+
+  <!-- Hidden photo element (the live camera video now lives in the viewfinder) -->
+  <img id="ar-photo" alt="Captured vehicle" class="opacity-0 pointer-events-none fixed inset-0 w-1 h-1" />
+
+  <!-- Main Minimal WAiNK Scanner Container -->
+  <main class="app-grid w-full max-w-md mx-auto flex flex-col gap-3">
+
+    <!-- Scanner Card -->
+    <section id="scanner-card" class="relative rounded-3xl overflow-hidden border border-white/15 bg-gradient-to-b from-[#231b3d]/90 via-[#151226]/95 to-[#1b112c]/95 px-3.5 py-6 sm:px-5 sm:py-7 shadow-[0_24px_70px_rgba(0,0,0,0.65)]">
+      <!-- Corner brackets: tucked into the card's corners, outside the padding so they never sit on content -->
+      <div class="absolute top-2 left-2 w-3.5 h-3.5 sm:top-2.5 sm:left-2.5 sm:w-4 sm:h-4 border-t-2 border-l-2 border-cyan-400/70 rounded-tl-md pointer-events-none"></div>
+      <div class="absolute top-2 right-2 w-3.5 h-3.5 sm:top-2.5 sm:right-2.5 sm:w-4 sm:h-4 border-t-2 border-r-2 border-cyan-400/70 rounded-tr-md pointer-events-none"></div>
+      <div class="absolute bottom-2 left-2 w-3.5 h-3.5 sm:bottom-2.5 sm:left-2.5 sm:w-4 sm:h-4 border-b-2 border-l-2 border-pink-400/70 rounded-bl-md pointer-events-none"></div>
+      <div class="absolute bottom-2 right-2 w-3.5 h-3.5 sm:bottom-2.5 sm:right-2.5 sm:w-4 sm:h-4 border-b-2 border-r-2 border-pink-400/70 rounded-br-md pointer-events-none"></div>
+
+      <!-- Top Status & Tabs Row -->
+      <div class="flex items-center justify-between gap-2 text-[11px] font-mono text-cyan-300/90 mb-3 px-1">
+        <!-- Phones: page dots + swipe hint instead of tab buttons -->
+        <div class="swipe-dots items-center gap-2 pl-1" aria-live="polite">
+          <span class="swipe-dot" data-dot="scanner"></span><span class="swipe-dot" data-dot="history"></span>
+          <span id="swipe-label" class="ml-1 text-[11px] font-bold text-white">Scanner</span>
+          <span id="swipe-hint" class="text-[10px] text-slate-400 font-sans">swipe ← history</span>
+        </div>
+        <div class="tab-switch flex items-center gap-1 bg-black/35 p-0.5 rounded-full border border-white/10">
+          <button type="button" id="tab-btn-scanner" class="px-3 py-1 rounded-full text-[11px] font-bold bg-gradient-to-r from-cyan-500/30 to-pink-500/30 text-white border border-cyan-400/40 transition">Scanner</button>
+          <button type="button" id="tab-btn-history" class="px-3 py-1 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition">History (<span id="history-count">0</span>)</button>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span id="scan-status-pill" class="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-cyan-200">READY</span>
+          <button id="btn-settings" type="button" aria-label="Settings" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="panel-scanner">
+      <!-- Live viewfinder: camera preview inside the card with the WAiNK crosshair on top -->
+      <div class="flex flex-col items-center justify-center pt-1 pb-3 select-none">
+        <div id="viewfinder" class="vf relative w-full rounded-2xl overflow-hidden bg-black/70 border border-white/10">
+          <video id="ar-video" autoplay playsinline muted class="vf-video absolute inset-0 w-full h-full object-cover"></video>
+          <img id="vf-still" alt="" class="vf-still absolute inset-0 w-full h-full object-cover" />
+          <div class="vf-shade absolute inset-0 pointer-events-none"></div>
+
+          <!-- Lock-on box around a detected vehicle -->
+          <div id="vf-bbox" class="vf-bbox absolute pointer-events-none"><span id="vf-bbox-label"></span></div>
+
+          <!-- HUD -->
+          <div class="vf-hud absolute top-2 left-2.5 flex items-center gap-1.5 text-[10px] font-mono font-bold tracking-wider text-white/90">
+            <span class="vf-live-dot"></span><span id="vf-mode">CAMERA</span>
+          </div>
+          <div id="vf-phase" class="vf-phase absolute top-2 right-2.5 text-[10px] font-mono font-bold tracking-wider"></div>
+
+          <!-- Scanning sweep across the whole view -->
+          <div class="vf-scanline absolute pointer-events-none"></div>
+
+          <!-- Crosshair: small white WAiNK starburst (same petal shape as the logo) inside four brackets -->
+          <div class="vf-reticle absolute left-1/2 top-1/2 pointer-events-none">
+            <div class="vf-corner vf-c-tl"></div>
+            <div class="vf-corner vf-c-tr"></div>
+            <div class="vf-corner vf-c-bl"></div>
+            <div class="vf-corner vf-c-br"></div>
+            <svg class="vf-mark" viewBox="72 72 368 368" aria-hidden="true">
+              <g fill="#ffffff">
+                <path id="vfPetal" d="M256 106 C280 150, 278 200, 256 238 C234 200, 232 150, 256 106 Z" />
+                <use href="#vfPetal" transform="rotate(60 256 256)" />
+                <use href="#vfPetal" transform="rotate(120 256 256)" />
+                <use href="#vfPetal" transform="rotate(180 256 256)" />
+                <use href="#vfPetal" transform="rotate(240 256 256)" />
+                <use href="#vfPetal" transform="rotate(300 256 256)" />
+              </g>
+            </svg>
+          </div>
+
+          <!-- Shown until the live camera starts (or if it can't) -->
+          <div class="vf-placeholder absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
+            <img src="/icons/waink-logo.svg?v=4" alt="" class="vf-offlogo" />
+            <div id="vf-placeholder" class="text-[12px] font-semibold text-slate-300/90">Starting camera…</div>
+          </div>
+        </div>
+
+        <p id="lock-status" class="mt-3 text-xs font-bold tracking-wide text-cyan-200/95 text-center">Hold to scan</p>
+        <p class="desk-only mt-1 text-[11px] text-slate-500 text-center">Tip: hold <kbd class="px-1 rounded bg-white/10 text-slate-300 font-mono">Space</kbd> to scan</p>
+      </div>
+
+      <!-- Segmented Scan Progress Bar -->
+      <div class="mt-3 mb-4 h-4 w-full rounded-full bg-black/50 border border-white/10 p-0.5 overflow-hidden">
+        <div id="scan-progress-fill" class="h-full rounded-full seg-bar transition-all duration-75" style="width: 0%"></div>
+      </div>
+
+      <!-- WAiNK IT Prompt Button (direct file input overlay for 100% reliable iOS consecutive captures) -->
+      <div class="relative w-full">
+        <button id="btn-scan" type="button" class="w-full py-3.5 px-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-500 hover:brightness-110 active:scale-[0.98] transition shadow-lg shadow-pink-500/25 select-none flex items-center justify-center gap-2.5">
+        <svg viewBox="0 0 120 120" class="w-5 h-5 shrink-0">
+          <circle cx="60" cy="60" r="56" fill="rgba(255,255,255,0.2)" />
+          <g fill="#ffffff">
+            <path d="M60 16 C65 32, 65 44, 60 53 C55 44, 55 32, 60 16 Z" />
+            <path d="M60 16 C65 32, 65 44, 60 53 C55 44, 55 32, 60 16 Z" transform="rotate(60 60 60)" />
+            <path d="M60 16 C65 32, 65 44, 60 53 C55 44, 55 32, 60 16 Z" transform="rotate(120 60 60)" />
+            <path d="M60 16 C65 32, 65 44, 60 53 C55 44, 55 32, 60 16 Z" transform="rotate(180 60 60)" />
+            <path d="M60 16 C65 32, 65 44, 60 53 C55 44, 55 32, 60 16 Z" transform="rotate(240 60 60)" />
+            <path d="M60 16 C65 32, 65 44, 60 53 C55 44, 55 32, 60 16 Z" transform="rotate(300 60 60)" />
+          </g>
+        </svg>
+        <span>WAiNK IT</span>
+        </button>
+        <input id="real-photo-input" type="file" accept="image/*" capture="environment" aria-label="Scan vehicle photo" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
+      </div>
+      </div>
+
+      <!-- History Panel -->
+      <div id="panel-history" class="hidden space-y-2.5 max-h-[420px] overflow-y-auto pr-0.5">
+        <div class="flex items-center justify-between text-xs px-1">
+          <span class="font-bold text-slate-300">Saved Vehicle Scans</span>
+          <button id="btn-clear-history" type="button" class="text-[11px] font-semibold text-rose-300 hover:text-rose-200">Clear All</button>
+        </div>
+        <div id="history-list" class="space-y-2"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Scan details pop-up (camera stays off while it's open) -->
+  <div id="details-sheet" class="hidden" role="dialog" aria-modal="true" aria-labelledby="ds-title">
+    <div class="ds-backdrop" data-close-details></div>
+    <div class="ds-panel">
+      <div class="ds-grab"></div>
+      <div class="flex items-center justify-between px-4 pt-2 pb-1">
+        <span id="ds-title" class="text-[11px] font-mono font-bold tracking-wider text-cyan-300">SCAN DETAILS</span>
+        <button type="button" data-close-details aria-label="Close" class="w-8 h-8 -mr-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 text-lg leading-none">×</button>
+      </div>
+      <div class="ds-body">
+        <section id="scan-results" class="hidden space-y-3"></section>
+      </div>
+      <div class="px-4 pt-3">
+        <button id="btn-back-to-scan" type="button" data-close-details class="w-full py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-500 hover:brightness-110 active:scale-[0.98] transition shadow-lg shadow-pink-500/25">Back to scan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal Setup / Install Modal -->
+  <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-950 border border-white/15 rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <h2 class="text-sm font-black text-white">WAiNK Setup &amp; Install</h2>
+        <button id="btn-close-settings" type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/10 text-slate-300 hover:text-white">Close</button>
+      </div>
+
+      <!-- Optional Gemini API Key (overrides the built-in one) -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-bold text-pink-300">AI Car &amp; Plate Guesser</span>
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-cyan-300 hover:underline">Get Free Key ↗</a>
+        </div>
+        <div class="flex gap-1.5">
+          <input id="gemini-key-input" type="password" placeholder="Paste your own Gemini key (optional)" class="flex-1 bg-slate-900 text-xs text-white placeholder-slate-500 rounded-lg px-2.5 py-2 border border-white/15 focus:outline-none focus:border-pink-400" />
+          <button id="btn-save-gemini-key" type="button" class="px-3 py-2 rounded-lg text-xs font-bold bg-pink-500/25 text-pink-200 border border-pink-400/40">Save</button>
+        </div>
+        <p id="ai-key-status" class="text-[11px] text-slate-400">Saves locally on your phone to auto-guess Year/Make/Model &amp; plates.</p>
+      </div>
+
+      <!-- Optional VIN Decoder -->
+      <div class="space-y-1.5 pt-2 border-t border-white/10">
+        <span class="text-xs font-bold text-cyan-300 block">Manual VIN Decode (Optional)</span>
+        <div class="flex gap-1.5">
+          <input id="vin-input" type="text" maxlength="17" placeholder="17-char VIN" class="flex-1 bg-slate-900 text-xs font-mono uppercase text-white placeholder-slate-500 rounded-lg px-2.5 py-2 border border-white/15 focus:outline-none focus:border-cyan-400" />
+          <button id="btn-decode-vin" type="button" class="px-3 py-2 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-200 border border-cyan-400/35">Decode</button>
+        </div>
+        <p id="vin-status" class="hidden text-[11px] text-cyan-300"></p>
+      </div>
+
+      <!-- Sound + Install -->
+      <div class="space-y-2 pt-2 border-t border-white/10 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="font-semibold text-slate-300">Scanner Sound Effects</span>
+          <button id="btn-sound" type="button" class="px-3 py-1.5 rounded-lg font-bold bg-white/10 text-cyan-300 border border-white/15">SFX: On</button>
+        </div>
+        <div id="native-install-wrap" class="hidden pt-1">
+          <button id="btn-native-install" type="button" class="w-full py-2.5 rounded-xl font-bold bg-gradient-to-r from-pink-500 to-cyan-500 text-white">Install App Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // Built-in Gemini API key (free tier), used when no key has been saved in Settings.
+    const BUILT_IN_GEMINI_KEY = '__GEMINI_KEY__';   // filled in by scripts/deploy.sh - never commit a real key
+
+    const state = {
+      cameraStream: null,
+      cameraReady: false,
+      cocoModel: null,
+      cocoLoading: false,
+      detectTimer: null,
+      lastDetections: [],
+      decodedVin: null,
+      soundEnabled: true,
+      holding: false,
+      holdRaf: null,
+      history: [],
+      apiKey: BUILT_IN_GEMINI_KEY,
+      scanCounter: 0
+    };
+
+    let audioCtx = null;
+
+    // ---------- iPhone audio fixes ----------
+    // Sounds follow the ringer switch and mix with other audio (music keeps playing).
+    // iOS only lets a page start sound from a completed tap (finger lifted), so unlock on the first
+    // tap/click/key anywhere, and re-wake the audio whenever iOS pauses ("interrupted") it.
+    function getAudio() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state !== 'running') { const p = audioCtx.resume(); if (p && p.catch) p.catch(() => {}); }
+        return audioCtx;
+      } catch (_) { return null; }
+    }
+    function unlockAudio() {
+      if (!state.soundEnabled) return;
+      const ac = getAudio(); if (!ac) return;
+      try {   // a silent blip is what actually unlocks playback on iOS
+        const b = ac.createBuffer(1, 1, 22050), s = ac.createBufferSource();
+        s.buffer = b; s.connect(ac.destination); s.start(0);
+      } catch (_) {}
+    }
+    ['touchend', 'pointerup', 'click', 'keydown'].forEach(ev =>
+      document.addEventListener(ev, unlockAudio, { capture: true, passive: true }));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && audioCtx && state.soundEnabled) getAudio(); });
+
+    function playTone(freq, duration, type = 'sine', gainVal = 0.08) {
+      if (!state.soundEnabled) return;
+      try {
+        if (!getAudio()) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (_) {}
+    }
+
+    function playScanDone() {
+      playTone(660, 0.09, 'triangle', 0.09);
+      setTimeout(() => playTone(990, 0.14, 'sine', 0.09), 80);
+    }
+
+    // ---------- Scanner sound effects (all follow the SFX toggle) ----------
+    const sfx = (() => {
+      let whir = null, blipTimer = null;
+      function ctx() {
+        if (!state.soundEnabled) return null;
+        return getAudio();
+      }
+      // Rising sci-fi "whir" while the button is held; pitch climbs with the progress bar.
+      function scanStart(durationMs) {
+        scanStop();
+        const ac = ctx(); if (!ac) return;
+        const t = ac.currentTime, d = durationMs / 1000;
+        const out = ac.createGain();
+        out.gain.setValueAtTime(0.0001, t);
+        out.gain.exponentialRampToValueAtTime(0.07, t + 0.06);
+        const filter = ac.createBiquadFilter();
+        filter.type = 'lowpass'; filter.Q.value = 8;
+        filter.frequency.setValueAtTime(600, t);
+        filter.frequency.exponentialRampToValueAtTime(3200, t + d);
+        const o1 = ac.createOscillator(); o1.type = 'sawtooth';
+        o1.frequency.setValueAtTime(180, t); o1.frequency.exponentialRampToValueAtTime(720, t + d);
+        const o2 = ac.createOscillator(); o2.type = 'square';
+        o2.frequency.setValueAtTime(182, t); o2.frequency.exponentialRampToValueAtTime(728, t + d);
+        const o2g = ac.createGain(); o2g.gain.value = 0.35;
+        // fast flutter for a "scanning" feel
+        const lfo = ac.createOscillator(); lfo.frequency.setValueAtTime(14, t); lfo.frequency.linearRampToValueAtTime(28, t + d);
+        const lfoGain = ac.createGain(); lfoGain.gain.value = 0.03;
+        lfo.connect(lfoGain); lfoGain.connect(out.gain);
+        o1.connect(filter); o2.connect(o2g); o2g.connect(filter); filter.connect(out); out.connect(ac.destination);
+        [o1, o2, lfo].forEach(o => o.start(t));
+        whir = { ac, out, nodes: [o1, o2, lfo] };
+      }
+      function scanStop() {
+        if (!whir) return;
+        const { ac, out, nodes } = whir; whir = null;
+        const t = ac.currentTime;
+        try {
+          out.gain.cancelScheduledValues(t);
+          out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), t);
+          out.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+          nodes.forEach(o => o.stop(t + 0.1));
+        } catch (_) {}
+      }
+      // Short "shutter" click when the frame is captured.
+      function capture() {
+        const ac = ctx(); if (!ac) return;
+        const t = ac.currentTime, len = Math.floor(ac.sampleRate * 0.05);
+        const buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+        const src = ac.createBufferSource(); src.buffer = buf;
+        const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
+        const g = ac.createGain(); g.gain.value = 0.25;
+        src.connect(hp); hp.connect(g); g.connect(ac.destination); src.start(t);
+        playTone(1320, 0.06, 'square', 0.035);
+      }
+      // Soft repeating blips while the AI gets the details.
+      function thinkingStart() {
+        thinkingStop();
+        let step = 0;
+        const blip = () => { playTone(step++ % 2 ? 740 : 880, 0.05, 'triangle', 0.035); };
+        blip();
+        blipTimer = setInterval(blip, 520);
+      }
+      function thinkingStop() { if (blipTimer) { clearInterval(blipTimer); blipTimer = null; } }
+      // Bright three-note chime when the details are ready.
+      function success() {
+        thinkingStop();
+        playTone(784, 0.1, 'triangle', 0.08);
+        setTimeout(() => playTone(1047, 0.1, 'triangle', 0.08), 90);
+        setTimeout(() => playTone(1568, 0.22, 'sine', 0.07), 180);
+      }
+      // Low two-note "nope" for no car / failed check.
+      function error() {
+        thinkingStop();
+        playTone(330, 0.14, 'square', 0.045);
+        setTimeout(() => playTone(220, 0.22, 'square', 0.045), 140);
+      }
+      // Short low buzz when you try to scan without a green box.
+      function denied() { playTone(196, 0.12, 'square', 0.035); }
+      function stopAll() { scanStop(); thinkingStop(); }
+      return { scanStart, scanStop, capture, thinkingStart, thinkingStop, success, error, denied, stopAll };
+    })();
+
+    function formatMoney(val) {
+      if (val === null || val === undefined) return 'N/A';
+      return '$' + val.toLocaleString('en-US');
+    }
+
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) return resolve();
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    async function ensureCocoModel() {
+      if (state.cocoModel) return state.cocoModel;
+      if (state.cocoLoading) return null;
+      state.cocoLoading = true;
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs');
+        await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3');
+        if (window.cocoSsd) {
+          state.cocoModel = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' });
+        }
+      } catch (_) {}
+      state.cocoLoading = false;
+      state.cocoFailed = !state.cocoModel;
+      return state.cocoModel;
+    }
+
+    // ---------- Live camera pause / resume ----------
+    // 'analyzing' (getting a car's details), 'history' (History open), 'hidden' (app in background):
+    // the picture freezes and the camera is fully released, so the phone's camera indicator turns off.
+    // It's reopened once none of those apply any more.
+    const livePauseReasons = new Set();
+    const CAMERA_CONSTRAINTS = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
+    let reopening = null;
+
+    function cameraTracks() { return state.cameraStream ? state.cameraStream.getVideoTracks() : []; }
+
+    function releaseCamera() {
+      cameraTracks().forEach(t => t.stop());
+      state.cameraStream = null;
+      $('ar-video').srcObject = null;
+      state.cameraReleased = true;
+    }
+
+    function fallBackToPhotoMode(msg) {
+      state.cameraReady = false;
+      state.cameraReleased = false;
+      $('real-photo-input').classList.remove('hidden');
+      setCameraOffMessage(msg);
+      $('lock-status').textContent = 'Tap to scan';
+      $('scan-status-pill').textContent = 'PHOTO READY';
+    }
+
+    function watchStream(stream) {
+      // If the camera stops on its own (another app grabs it, permission revoked), fall back to photo mode.
+      stream.getVideoTracks().forEach(t => t.addEventListener('ended', () => {
+        if (state.cameraStream !== stream) return;           // we stopped it ourselves
+        if (document.hidden || livePauseReasons.size) {        // phone took it while we were away: reopen later
+          state.cameraStream = null; state.cameraReleased = true; return;
+        }
+        fallBackToPhotoMode('Camera stopped — tap to take a photo');
+      }));
+    }
+
+    async function reopenCamera() {
+      if (reopening) return reopening;
+      $('vf-mode').textContent = 'STARTING';
+      reopening = (async () => {
+        let timedOut = false;
+        try {
+          const request = navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
+          // If the phone answers only after we gave up, close that camera right away.
+          request.then(s => { if (timedOut) s.getTracks().forEach(t => t.stop()); }, () => {});
+          const stream = await Promise.race([
+            request,
+            new Promise((_, rej) => setTimeout(() => { timedOut = true; rej(new Error('timeout')); }, 6000))
+          ]);
+          if (livePauseReasons.size) { stream.getTracks().forEach(t => t.stop()); return; } // left again meanwhile
+          state.cameraStream = stream;
+          state.cameraReleased = false;
+          state.needsCameraTap = false;
+          watchStream(stream);
+          const vid = $('ar-video');
+          vid.srcObject = stream;
+          await vid.play().catch(() => {});
+          $('viewfinder').classList.add('live');
+          $('vf-mode').textContent = 'LIVE';
+          $('viewfinder').classList.remove('paused');
+          clearFrozenFrame();
+          // Only replace our own "tap to turn it back on" hint; keep messages like "Saved…" or "AI check failed…"
+          if ($('lock-status').textContent.startsWith('Tap the camera window')) $('lock-status').textContent = 'Hold to scan';
+        } catch (e) {
+          if (timedOut || (e && e.name === 'NotAllowedError' && navigator.userActivation && !navigator.userActivation.isActive)) {
+            // Phone wants a tap before it hands the camera back: ask for one.
+            clearFrozenFrame();
+            $('viewfinder').classList.remove('live', 'locked');
+            $('vf-placeholder').textContent = 'Tap here to turn the camera back on';
+            $('lock-status').textContent = 'Tap the camera window to turn it back on';
+            state.needsCameraTap = true;
+          } else {
+            fallBackToPhotoMode('Camera blocked — allow camera access, or tap to take a photo');
+          }
+        } finally {
+          reopening = null;
+        }
+      })();
+      return reopening;
+    }
+
+    function pauseLive(reason) {
+      livePauseReasons.add(reason);
+      if (!state.cameraReady) return;
+      const vid = $('ar-video');
+      if (!vid.paused) vid.pause();
+      $('vf-mode').textContent = 'PAUSED';
+      $('viewfinder').classList.add('paused');
+      $('viewfinder').classList.remove('locked');
+      // Keep the scanned frame on screen (some phones show black once the camera is switched off)
+      if (vid.videoWidth && !$('viewfinder').classList.contains('has-still')) {
+        try {
+          const fc = document.createElement('canvas');
+          fc.width = vid.videoWidth; fc.height = vid.videoHeight;
+          fc.getContext('2d').drawImage(vid, 0, 0);
+          $('vf-still').src = fc.toDataURL('image/jpeg', 0.8);
+          $('viewfinder').classList.add('has-still');
+        } catch (_) {}
+      }
+      // Fully let go of the camera (phone's camera indicator turns off); it's reopened on resume.
+      releaseCamera();
+    }
+
+    function clearFrozenFrame() {
+      $('viewfinder').classList.remove('has-still');
+      $('vf-still').removeAttribute('src');
+    }
+
+    function resumeLive(reason) {
+      livePauseReasons.delete(reason);
+      if (livePauseReasons.size || !state.cameraReady) return;
+      if (state.cameraReleased || !state.cameraStream) { reopenCamera(); return; }
+      cameraTracks().forEach(t => { t.enabled = true; });
+      const p = $('ar-video').play();
+      if (p && p.catch) p.catch(() => {});
+      $('vf-mode').textContent = 'LIVE';
+      $('viewfinder').classList.remove('paused');
+      clearFrozenFrame();
+    }
+
+    // Let go of the camera when you leave the app or lock the phone; reopen when you return.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) pauseLive('hidden'); else resumeLive('hidden');
+    });
+    window.addEventListener('pagehide', () => pauseLive('hidden'));
+    window.addEventListener('pageshow', () => { if (!document.hidden) resumeLive('hidden'); });
+    // What to tell the user to do to scan
+    function scanPrompt() { return state.cameraReady ? 'Hold to scan' : 'Tap to scan'; }
+
+    // ---------- Viewfinder helpers ----------
+    // How the camera frame maps onto the on-screen viewfinder (video uses object-fit: cover).
+    function vfGeometry() {
+      const vid = $('ar-video');
+      const vf = $('viewfinder');
+      const vw = vid.videoWidth, vh = vid.videoHeight;
+      const cw = vf.clientWidth, ch = vf.clientHeight;
+      if (!vw || !vh || !cw || !ch) return null;
+      const scale = Math.max(cw / vw, ch / vh);
+      return { vw, vh, cw, ch, scale, offX: (cw - vw * scale) / 2, offY: (ch - vh * scale) / 2 };
+    }
+
+    function setViewfinderPhase(text) {
+      $('vf-phase').textContent = text || '';
+    }
+
+    function setScanningFx(on, phase) {
+      $('viewfinder').classList.toggle('scanning', Boolean(on));
+      setViewfinderPhase(on ? (phase || 'SCANNING') : '');
+    }
+
+    function showLockBox(det) {
+      const vf = $('viewfinder');
+      const g = vfGeometry();
+      if (!det || !g) { vf.classList.remove('locked'); return; }
+      const [x, y, w, h] = det.bbox;
+      let left = x * g.scale + g.offX, top = y * g.scale + g.offY;
+      let right = left + w * g.scale, bottom = top + h * g.scale;
+      left = Math.max(2, left); top = Math.max(22, top);
+      right = Math.min(g.cw - 2, right); bottom = Math.min(g.ch - 2, bottom);
+      if (right - left < 12 || bottom - top < 12) { vf.classList.remove('locked'); return; }
+      const box = $('vf-bbox');
+      box.style.left = left + 'px'; box.style.top = top + 'px';
+      box.style.width = (right - left) + 'px'; box.style.height = (bottom - top) + 'px';
+      $('vf-bbox-label').textContent = `${det.class.toUpperCase()} ${Math.round(det.score * 100)}%`;
+      vf.classList.add('locked');
+    }
+
+    // Prefer the vehicle under the crosshair, then the biggest one in view.
+    function pickTargetVehicle(vehicles) {
+      const g = vfGeometry();
+      if (!vehicles.length) return [];
+      const cx = g ? g.vw / 2 : 0, cy = g ? g.vh / 2 : 0;
+      const scored = vehicles.map(d => {
+        const [x, y, w, h] = d.bbox;
+        const underCrosshair = g && cx >= x && cx <= x + w && cy >= y && cy <= y + h;
+        return { d, score: (underCrosshair ? 1e9 : 0) + w * h };
+      });
+      return scored.sort((a, b) => b.score - a.score).map(s => s.d);
+    }
+
+    function setCameraOffMessage(msg) {
+      const vf = $('viewfinder');
+      vf.classList.remove('live', 'locked');
+      $('vf-placeholder').textContent = msg;
+    }
+
+    async function initHiddenCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        state.cameraReady = false;
+        $('scan-status-pill').textContent = 'PHOTO READY';
+        $('lock-status').textContent = 'Tap to scan';
+        setCameraOffMessage(location.protocol === 'https:' || location.hostname === 'localhost'
+          ? 'Live camera not supported here — tap to take a photo'
+          : 'Live camera needs https:// — tap to take a photo');
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
+        state.cameraStream = stream;
+        state.cameraReleased = false;
+        const vid = $('ar-video');
+        vid.srcObject = stream;
+        await vid.play();
+        state.cameraReady = true;
+        $('viewfinder').classList.add('live');
+        $('vf-mode').textContent = 'LIVE';
+        $('real-photo-input').classList.add('hidden');
+        $('scan-status-pill').textContent = 'AR LIVE';
+        $('lock-status').textContent = 'Hold to scan';
+        watchStream(stream);
+        // History open or app hidden while permission was being granted: let go right away.
+        if (!$('panel-history').classList.contains('hidden')) pauseLive('history');
+        if (document.hidden) pauseLive('hidden');
+
+        ensureCocoModel().then(model => {
+          if (!model) return;
+          state.detectTimer = setInterval(async () => {
+            if (!state.cameraReady || vid.readyState < 2 || document.hidden || vid.paused || livePauseReasons.size) return;
+            try {
+              const preds = await model.detect(vid);
+              const vehicles = pickTargetVehicle(preds.filter(d => ['car', 'truck', 'motorcycle', 'bus'].includes(d.class)));
+              state.lastDetections = vehicles;
+              showLockBox(vehicles[0] || null);
+              if (state.holding || $('viewfinder').classList.contains('scanning')) return;
+              if (vehicles.length > 0) {
+                const top = vehicles[0];
+                $('lock-status').textContent = `${top.class.toUpperCase()} ${Math.round(top.score * 100)}% — hold to scan`;
+              } else {
+                $('lock-status').textContent = 'Hold to scan';
+              }
+            } catch (_) {}
+          }, 420);
+        });
+      } catch (_) {
+        state.cameraReady = false;
+        $('scan-status-pill').textContent = 'PHOTO READY';
+        $('lock-status').textContent = 'Tap to scan';
+        setCameraOffMessage('Camera blocked — allow camera access, or tap to take a photo');
+      }
+    }
+
+    function sampleDominantColor(sourceEl, bbox) {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 48; c.height = 48;
+        const ctx = c.getContext('2d');
+        const sw = sourceEl.videoWidth || sourceEl.naturalWidth || sourceEl.width || 320;
+        const sh = sourceEl.videoHeight || sourceEl.naturalHeight || sourceEl.height || 240;
+        if (bbox) {
+          const [bx, by, bw, bh] = bbox;
+          ctx.drawImage(sourceEl, bx + bw * 0.3, by + bh * 0.35, Math.max(1, bw * 0.4), Math.max(1, bh * 0.3), 0, 0, 48, 48);
+        } else {
+          ctx.drawImage(sourceEl, sw * 0.35, sh * 0.38, sw * 0.30, sh * 0.24, 0, 0, 48, 48);
+        }
+        const data = ctx.getImageData(0, 0, 48, 48).data;
+        const chromatic = [];
+        const all = [];
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i], g = data[i + 1], b = data[i + 2];
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+          const v = mx / 255;
+          const s = mx === 0 ? 0 : (mx - mn) / mx;
+          if (v > 0.08) {
+            all.push([r, g, b]);
+            if (s > 0.26) chromatic.push([r, g, b]);
+          }
+        }
+        // Mostly-dark samples (black paint, night, blank frame) have no bright pixels: treat as black instead of dividing by zero.
+        const pool = (chromatic.length && chromatic.length >= all.length * 0.22) ? chromatic : (all.length ? all : [[20, 20, 22]]);
+        let r = 0, g = 0, b = 0;
+        pool.forEach(p => { r += p[0]; g += p[1]; b += p[2]; });
+        r = Math.round(r / pool.length);
+        g = Math.round(g / pool.length);
+        b = Math.round(b / pool.length);
+        const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+
+        const rn = r / 255, gn = g / 255, bn = b / 255;
+        const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn);
+        const d = mx - mn;
+        const val = mx;
+        const sat = mx === 0 ? 0 : d / mx;
+        let hue = 0;
+        if (d > 0) {
+          if (mx === rn) hue = ((gn - bn) / d + (gn < bn ? 6 : 0)) * 60;
+          else if (mx === gn) hue = ((bn - rn) / d + 2) * 60;
+          else hue = ((rn - gn) / d + 4) * 60;
+        }
+
+        let name = 'Gray';
+        if (val < 0.22) name = 'Black';
+        else if (sat < 0.20) {
+          if (val >= 0.62) name = 'White';
+          else if (val >= 0.40) name = 'Silver';
+          else name = 'Gray';
+        } else if (hue >= 335 || hue < 18) {
+          name = val < 0.52 ? 'Maroon' : 'Red';
+        } else if (hue < 42) {
+          name = (sat < 0.45 || val < 0.50) ? 'Brown' : 'Orange';
+        } else if (hue < 68) {
+          name = 'Yellow / Gold';
+        } else if (hue < 165) {
+          name = 'Green';
+        } else if (hue < 200) {
+          name = 'Teal';
+        } else if (hue < 255) {
+          name = 'Blue';
+        } else {
+          name = 'Purple';
+        }
+        return { hex, name };
+      } catch (_) {
+        return { hex: '#38bdf8', name: 'Detected Paint' };
+      }
+    }
+
+    function captureFrameBase64(sourceEl) {
+      const c = document.createElement('canvas');
+      const fullW = sourceEl.videoWidth || sourceEl.naturalWidth || sourceEl.width || 640;
+      const fullH = sourceEl.videoHeight || sourceEl.naturalHeight || sourceEl.height || 480;
+      // For the live camera, send only what the viewfinder shows (it crops the frame to fit).
+      let sx = 0, sy = 0, sw = fullW, sh = fullH;
+      if (sourceEl.tagName === 'VIDEO') {
+        const g = vfGeometry();
+        if (g) {
+          sw = Math.min(fullW, g.cw / g.scale);
+          sh = Math.min(fullH, g.ch / g.scale);
+          sx = (fullW - sw) / 2;
+          sy = (fullH - sh) / 2;
+        }
+      }
+      const maxDim = 1280;
+      const scale = Math.min(1, maxDim / Math.max(sw, sh));
+      c.width = Math.max(1, Math.round(sw * scale));
+      c.height = Math.max(1, Math.round(sh * scale));
+      const ctx = c.getContext('2d');
+      ctx.drawImage(sourceEl, sx, sy, sw, sh, 0, 0, c.width, c.height);
+
+      // Catch blank/black frames (camera not delivering images) instead of sending them to the AI.
+      const probe = document.createElement('canvas');
+      probe.width = 24; probe.height = 24;
+      const pctx = probe.getContext('2d');
+      pctx.drawImage(c, 0, 0, 24, 24);
+      const px = pctx.getImageData(0, 0, 24, 24).data;
+      let lum = 0, lo = 255, hi = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const l = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+        lum += l; lo = Math.min(lo, l); hi = Math.max(hi, l);
+      }
+      lum /= px.length / 4;
+      if (lum < 6 && hi < 20) throw new Error('camera image was blank — try again');
+
+      return c.toDataURL('image/jpeg', 0.88).split(',')[1];
+    }
+
+    // Pull the first JSON object out of the model's reply (handles ```json fences, arrays, extra text).
+    function parseCarJson(raw) {
+      let txt = (raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+      let obj;
+      try { obj = JSON.parse(txt); } catch (_) {
+        const m = txt.match(/\{[\s\S]*\}/);
+        if (!m) return null;
+        try { obj = JSON.parse(m[0]); } catch (_) { return null; }
+      }
+      if (Array.isArray(obj)) obj = obj[0];
+      if (!obj || typeof obj !== 'object') return null;
+      const s = (v) => (v === null || v === undefined) ? '' : String(v).trim();
+      const n = (v) => {
+        const x = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[^0-9.]/g, ''));
+        return Number.isFinite(x) && x > 0 ? Math.round(x / 50) * 50 : null;
+      };
+      const hex = /^#?[0-9a-f]{6}$/i.test(s(obj.color_hex)) ? '#' + s(obj.color_hex).replace('#', '').toLowerCase() : '';
+      return {
+        year: s(obj.year), make: s(obj.make), model: s(obj.model), trim: s(obj.trim),
+        color: s(obj.color), colorHex: hex, plate: s(obj.plate), confidence: s(obj.confidence),
+        value: {
+          privateLow: n(obj.private_party_low), privateHigh: n(obj.private_party_high),
+          tradeLow: n(obj.trade_in_low), tradeHigh: n(obj.trade_in_high)
+        }
+      };
+    }
+
+    async function identifyCar(sourceEl, frameB64) {
+      let apiKey = '';
+      try { apiKey = localStorage.getItem('waink_gemini_key_v1') || ''; } catch (_) {}
+      if (!apiKey) apiKey = state.apiKey || '';
+      if (!apiKey) return null;
+
+      // Frame may be grabbed ahead of time (before the live camera is switched off)
+      const b64 = frameB64 || captureFrameBase64(sourceEl);
+      const prompt = 'You are a car-spotting expert. Identify the vehicle in this photo from its body shape, grille, headlights, tail lights, badges and wheels. ' +
+        'Always give your BEST GUESS for make and model, even if you are not certain, and lower the confidence instead of leaving them blank. ' +
+        'Estimate the model year (or the generation\'s first year) as a 4-digit string. Only leave a field empty if there is truly no vehicle visible. ' +
+        'Only fill in plate if the license plate text is clearly readable. ' +
+        'For color: name the factory PAINT color of the main vehicle\'s body panels only (doors, hood, fenders). Ignore the background, sky, road, other cars, ' +
+        'windows, tires, chrome, shadows and reflections. Use a common color name (e.g. "Pearl White", "Dark Gray Metallic", "Red"), and give color_hex as a #RRGGBB ' +
+        'approximation of that paint. ' +
+        'Also estimate typical current US used-car values for this exact year/make/model/trim in average condition with typical mileage, the way Kelley Blue Book ' +
+        'would value it: private_party_low, private_party_high, trade_in_low, trade_in_high as whole US dollars (numbers). ' +
+        'Return ONLY one JSON object with keys: year, make, model, trim, color, color_hex, plate, confidence ("High"|"Medium"|"Low"), ' +
+        'private_party_low, private_party_high, trade_in_low, trade_in_high.';
+      // Best first; 503 (overloaded) / 404 (retired) fall through to the next one immediately.
+      const models = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest'];
+      let lastErr = 'API error';
+
+      for (let i = 0; i < models.length; i++) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${models[i]}:generateContent`;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 25000);
+        let res;
+        try {
+          res = await fetch(url, {
+            method: 'POST',
+            signal: ctrl.signal,
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { inline_data: { mime_type: 'image/jpeg', data: b64 } },
+                  { text: prompt }
+                ]
+              }],
+              generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
+            })
+          });
+        } catch (e) {
+          lastErr = e.name === 'AbortError' ? 'timed out' : 'network error';
+          continue;
+        } finally {
+          clearTimeout(timer);
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.promptFeedback?.blockReason) { lastErr = 'image blocked by Gemini'; continue; }
+          const parts = data?.candidates?.[0]?.content?.parts || [];
+          const raw = parts.filter(p => typeof p.text === 'string' && !p.thought).map(p => p.text).join('');
+          const car = parseCarJson(raw);
+          if (car) return car;
+          lastErr = 'bad AI response';
+          continue;
+        }
+
+        let errMsg = '';
+        try { errMsg = (await res.json())?.error?.message || ''; } catch (_) {}
+        lastErr = `API ${res.status}`;
+        if (res.status === 401 || res.status === 403 || /api key/i.test(errMsg)) { lastErr = 'invalid API key'; break; }
+        if (res.status === 503) lastErr = 'Gemini is overloaded, try again';
+        if (res.status === 429) { lastErr = 'free limit reached, try again later'; await new Promise(r => setTimeout(r, 700)); }
+      }
+      throw new Error(lastErr);
+    }
+
+    function buildKbbUrl(year, make, model) {
+      const slug = (s) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const y = (year || '').toString().trim();
+      const mk = slug(make);
+      const md = slug(model);
+      if (mk && md && y) return `https://www.kbb.com/${mk}/${md}/${y}/`;
+      if (mk && md) return `https://www.kbb.com/${mk}/${md}/`;
+      return 'https://www.kbb.com/whats-my-car-worth/';
+    }
+
+    function buildRealVehicleScan(det, sourceEl) {
+      const vClass = det ? det.class : 'car';
+      const conf = det ? Math.round(det.score * 100) : null;
+      const paint = sampleDominantColor(sourceEl, det ? det.bbox : null);
+      const rgbSum = parseInt(paint.hex.slice(1, 3), 16) + parseInt(paint.hex.slice(3, 5), 16) + parseInt(paint.hex.slice(5, 7), 16);
+      const variance = (rgbSum % 7) * 450;
+      const trackers = ['None', 'Standard', 'Advanced'];
+      const accesses = ['Unlocked', 'Locked (Slim Jim)', 'Keyless (Key Cloner)'];
+      const profiles = {
+        car: { title: 'Passenger Vehicle', gtaClass: 'Sports / Sedan', sell: 5200 + variance, reg: 18500 + variance * 2, access: accesses[rgbSum % 3], tracker: trackers[rgbSum % 3] },
+        truck: { title: 'Pickup / SUV', gtaClass: 'Utility / Pickup', sell: 3800 + variance, reg: 14200 + variance * 2, access: 'Locked (Slim Jim)', tracker: trackers[rgbSum % 2] },
+        motorcycle: { title: 'Street Motorcycle', gtaClass: 'Motorcycle', sell: 2900 + variance, reg: 11500 + variance * 2, access: 'Unlocked', tracker: 'None' },
+        bus: { title: 'Commercial Transit', gtaClass: 'Transport', sell: 2100, reg: null, access: 'Unlocked', tracker: 'Standard' }
+      };
+      const p = profiles[vClass] || profiles.car;
+      return { ...p, vClass, conf, paint, year: '', make: '', model: '', trim: '', plate: '', scanNum: state.scanCounter };
+    }
+
+    // While identifying, the frozen camera frame + status line say "Getting details…" (nothing else to update)
+    function setResultsWaiting() {}
+
+    // ---------- Scan details pop-up ----------
+    // Camera stays released while it's open; "Back to scan" (or ×, backdrop, Esc) closes it and the camera comes back.
+    function openDetails(fromHistory) {
+      const sheet = $('details-sheet');
+      $('btn-back-to-scan').textContent = fromHistory ? 'Back to history' : 'Back to scan';
+      $('scan-results').classList.remove('hidden');
+      sheet.classList.remove('hidden');
+      document.documentElement.classList.add('sheet-open');
+      sheet.querySelector('.ds-body').scrollTop = 0;
+      pauseLive('details');
+      $('scan-status-pill').textContent = 'DETAILS';
+    }
+    function closeDetails() {
+      const sheet = $('details-sheet');
+      if (sheet.classList.contains('hidden')) return;
+      sheet.classList.add('hidden');
+      document.documentElement.classList.remove('sheet-open');
+      $('scan-status-pill').textContent = state.cameraReady ? 'AR LIVE' : 'READY';
+      resumeLive('details');
+    }
+    function detailsOpen() { return !$('details-sheet').classList.contains('hidden'); }
+
+    // Median of the AI's private-party price estimate (low/high), rounded to $50. Trade-in is not used.
+    function medianPrice(value) {
+      const v = value || {};
+      const nums = [v.privateLow, v.privateHigh]
+        .filter(n => typeof n === 'number' && Number.isFinite(n) && n > 0)
+        .sort((a, b) => a - b);
+      if (!nums.length) return null;
+      const mid = Math.floor(nums.length / 2);
+      const m = nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+      return Math.round(m / 50) * 50;
+    }
+
+    function renderResults(scan) {
+      const box = $('scan-results');
+      box.classList.remove('hidden');
+      // Sim Sell Value = median private-party price; Sim Register Cost = 4x that (falls back to the old sim numbers)
+      const medPrice = medianPrice(scan.value);
+      const simSell = medPrice || scan.sell;
+      const simReg = medPrice ? medPrice * 4 : scan.reg;
+      const carTitle = [scan.year, scan.make, scan.model, scan.trim].filter(Boolean).join(' ') || scan.title;
+      const kbbUrl = buildKbbUrl(scan.year, scan.make, scan.model);
+
+      const vinBlock = state.decodedVin ? `
+        <div class="grid grid-cols-2 gap-1.5 text-[11px] bg-white/5 rounded-xl p-2.5">
+          <div><span class="text-slate-400">Body:</span> <strong class="text-white">${state.decodedVin.body || scan.gtaClass}</strong></div>
+          <div><span class="text-slate-400">Drive:</span> <strong class="text-white">${state.decodedVin.drive || 'N/A'}</strong></div>
+          <div><span class="text-slate-400">Engine:</span> <strong class="text-white">${state.decodedVin.engine || 'N/A'}</strong></div>
+          <div><span class="text-slate-400">Fuel:</span> <strong class="text-white">${state.decodedVin.fuel || 'N/A'}</strong></div>
+        </div>` : '';
+
+      const v = scan.value || {};
+      const range = (lo, hi) => (lo && hi) ? `${formatMoney(Math.min(lo, hi))} – ${formatMoney(Math.max(lo, hi))}` : (lo || hi) ? formatMoney(lo || hi) : '';
+      const privateRange = range(v.privateLow, v.privateHigh);
+      const tradeRange = range(v.tradeLow, v.tradeHigh);
+      const valueBlock = scan.aiPending
+        ? `<div class="bg-blue-500/10 border border-blue-400/25 rounded-xl p-2.5 text-xs text-slate-300">Estimating market value…</div>`
+        : (privateRange || tradeRange) ? `
+        <div class="bg-blue-500/10 border border-blue-400/25 rounded-xl p-2.5 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-200">Est. Market Value</span>
+            <span class="text-[9px] text-slate-400">AI estimate · avg condition</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div><span class="text-[10px] text-slate-400 block">Private Party</span><span class="text-sm font-black text-white">${privateRange || 'N/A'}</span></div>
+            <div><span class="text-[10px] text-slate-400 block">Trade-In</span><span class="text-sm font-black text-white">${tradeRange || 'N/A'}</span></div>
+          </div>
+          <p class="text-[9px] text-slate-500">Rough guess, not an official Kelley Blue Book number. Tap below for the exact KBB value.</p>
+        </div>` : '';
+
+      box.innerHTML = `
+        <div class="flex items-start justify-between gap-2 border-b border-white/10 pb-2.5">
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Scan #${scan.scanNum || 1} • ${scan.timeLabel || 'Now'}${scan.conf ? ` • ${scan.conf}% Lock` : ''}</p>
+            <h2 class="text-base font-black text-white">${esc(carTitle)}</h2>
+          </div>
+          ${scan.plate ? `<span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30">${esc(scan.plate)}</span>` : `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-slate-200">${esc(scan.gtaClass)}</span>`}
+        </div>
+
+        <div class="flex items-center gap-2 bg-white/5 rounded-xl p-2.5 text-xs">
+          ${scan.aiPending
+            ? `<span class="w-4 h-4 rounded-full border border-white/40 shrink-0 bg-white/10 animate-pulse"></span>
+               <span class="text-slate-300">Paint: <strong class="text-slate-400">Detecting…</strong></span>`
+            : `<span class="w-4 h-4 rounded-full border border-white/40 shrink-0" style="background:${esc(scan.paint.hex)}"></span>
+               <span class="text-slate-300">Paint: <strong class="text-white">${esc(scan.paint.name)}</strong></span>`}
+        </div>
+
+        ${valueBlock}
+
+        ${vinBlock}
+
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-white/5 rounded-xl p-2.5">
+            <span class="text-[10px] text-slate-400 block">Access</span>
+            <span class="font-bold text-white">${scan.access}</span>
+          </div>
+          <div class="bg-white/5 rounded-xl p-2.5">
+            <span class="text-[10px] text-slate-400 block">Tracker</span>
+            <span class="font-bold text-amber-300">${scan.tracker}</span>
+          </div>
+          <div class="bg-emerald-500/10 border border-emerald-400/25 rounded-xl p-2.5">
+            <span class="text-[10px] text-emerald-300 block">Sim Sell Value</span>
+            <span class="text-sm font-black text-white">${formatMoney(simSell)}</span>
+          </div>
+          <div class="bg-cyan-500/10 border border-cyan-400/25 rounded-xl p-2.5">
+            <span class="text-[10px] text-cyan-300 block">Sim Register Cost</span>
+            <span class="text-sm font-black text-white">${formatMoney(simReg)}</span>
+          </div>
+        </div>
+
+        <!-- Quick Year / Make / Model override for KBB -->
+        <div class="grid grid-cols-3 gap-1.5 pt-1">
+          <input id="res-year" type="number" value="${esc(scan.year)}" placeholder="Year" class="bg-slate-900 text-xs text-white placeholder-slate-500 rounded-lg px-2 py-1.5 border border-white/15 focus:outline-none focus:border-cyan-400" />
+          <input id="res-make" type="text" value="${esc(scan.make)}" placeholder="Make" class="bg-slate-900 text-xs text-white placeholder-slate-500 rounded-lg px-2 py-1.5 border border-white/15 focus:outline-none focus:border-cyan-400" />
+          <input id="res-model" type="text" value="${esc(scan.model)}" placeholder="Model" class="bg-slate-900 text-xs text-white placeholder-slate-500 rounded-lg px-2 py-1.5 border border-white/15 focus:outline-none focus:border-cyan-400" />
+        </div>
+
+        ${!state.apiKey && !scan.make ? `<button type="button" id="btn-inline-setup" class="w-full py-2 px-3 rounded-xl text-[11px] font-bold bg-pink-500/15 text-pink-200 border border-pink-400/35 hover:bg-pink-500/25 transition">⚙ Add Free Gemini Key to Auto-Guess Make &amp; Model</button>` : ''}
+        <a id="kbb-link" href="${kbbUrl}" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:brightness-110 transition shadow-lg">
+          Get Kelley Blue Book Value ↗
+        </a>
+      `;
+
+      const updateLink = () => {
+        const u = buildKbbUrl($('res-year').value, $('res-make').value, $('res-model').value);
+        $('kbb-link').href = u;
+      };
+      $('res-year').addEventListener('input', updateLink);
+      $('res-make').addEventListener('input', updateLink);
+      $('res-model').addEventListener('input', updateLink);
+      const inlineSetup = $('btn-inline-setup');
+      if (inlineSetup) inlineSetup.addEventListener('click', () => $('settings-modal').classList.remove('hidden'));
+    }
+
+    function persistHistory() {
+      try {
+        localStorage.setItem('waink_scan_history_v1', JSON.stringify(state.history.slice(0, 50)));
+      } catch (_) {}
+    }
+
+    function renderHistory() {
+      $('history-count').textContent = state.history.length;
+      const sl = $('swipe-label');
+      if (sl && sl.textContent.startsWith('History')) sl.textContent = `History (${state.history.length})`;
+      const list = $('history-list');
+      if (!state.history.length) {
+        list.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">No vehicles scanned yet.</p>';
+        return;
+      }
+      list.innerHTML = state.history.map((item, idx) => {
+        const title = [item.year, item.make, item.model, item.trim].filter(Boolean).join(' ') || item.title;
+        const kbbUrl = buildKbbUrl(item.year, item.make, item.model);
+        return `
+          <div class="bg-slate-900/90 border border-white/10 rounded-2xl p-3 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="w-3.5 h-3.5 rounded-full border border-white/40 shrink-0" style="background:${esc(item.paint?.hex || '#38bdf8')}"></span>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-white truncate">${esc(title)}</p>
+                  <p class="text-[10px] text-slate-400">${esc(item.paint?.name || 'Vehicle')} • ${esc(item.timeLabel || '')}</p>
+                </div>
+              </div>
+              ${item.plate ? `<span class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30 shrink-0">${esc(item.plate)}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <a href="${kbbUrl}" target="_blank" rel="noopener noreferrer" class="flex-1 text-center py-1.5 rounded-lg text-[11px] font-bold bg-blue-600/30 text-cyan-200 border border-cyan-400/30 hover:bg-blue-600/45 transition">KBB Value ↗</a>
+              <button type="button" data-hist-idx="${idx}" class="hist-view-btn px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 text-white hover:bg-white/20 transition">View</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function saveOrUpdateHistory(entry) {
+      const idx = state.history.findIndex(h => h.id === entry.id);
+      if (idx >= 0) state.history[idx] = entry;
+      else state.history.unshift(entry);
+      persistHistory();
+      renderHistory();
+    }
+
+    function executeScan(sourceEl) {
+      state.scanCounter += 1;
+      const det = state.lastDetections[0] || null;
+      const scan = buildRealVehicleScan(det, sourceEl);
+      scan.id = Date.now();
+      scan.timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      sfx.scanStop();
+      sfx.capture();
+      $('scan-status-pill').textContent = 'SCANNED';
+      $('scan-progress-fill').style.width = '100%';
+
+      let hasKey = Boolean(state.apiKey);
+      if (!hasKey) {
+        try { hasKey = Boolean(localStorage.getItem('waink_gemini_key_v1')); } catch (_) {}
+      }
+      // With AI available, wait for its paint/value instead of showing the rough pixel sample.
+      // Details are only shown once the AI has them; until then the previous car's card is hidden.
+      scan.aiPending = false;
+      if (hasKey) {
+        $('scan-results').classList.add('hidden');
+        $('scan-results').innerHTML = '';
+        setResultsWaiting(true);
+      } else {
+        renderResults(scan);
+        saveOrUpdateHistory({ ...scan });
+        openDetails(false);
+      }
+
+      // Pause the live camera on the scanned frame while the AI gets the details, then go back to live.
+      const pausedForScan = Boolean(sourceEl && sourceEl.tagName === 'VIDEO' && hasKey);
+      // Grab the frame for the AI first, then switch the camera off
+      let frameB64 = null, frameErr = null;
+      if (pausedForScan) {
+        try { frameB64 = captureFrameBase64(sourceEl); } catch (e) { frameErr = e; }
+        pauseLive('analyzing');
+      }
+      if (hasKey) setScanningFx(true, 'GETTING DETAILS');
+      else setScanningFx(false);
+      function endScanFx() {
+        setScanningFx(false);
+        if (pausedForScan) setTimeout(() => resumeLive('analyzing'), 700);
+      }
+
+      function purgePhotoAndWait() {
+        if (sourceEl && sourceEl.tagName === 'CANVAS') {
+          sourceEl.width = 0;
+          sourceEl.height = 0;
+        }
+        const arPhoto = $('ar-photo');
+        if (arPhoto) arPhoto.removeAttribute('src');
+        const inp = $('real-photo-input');
+        if (inp) inp.value = '';
+        setTimeout(() => {
+          $('scan-progress-fill').style.width = '0%';
+          $('scan-status-pill').textContent = state.cameraReady ? 'AR LIVE' : 'READY';
+        }, 500);
+      }
+
+      if (hasKey) {
+        $('lock-status').textContent = 'Getting details…';
+        const thinkTimer = setTimeout(() => sfx.thinkingStart(), 180);   // after the capture click
+        let gotDetails = false;
+        (frameErr ? Promise.reject(frameErr) : identifyCar(sourceEl, frameB64)).then(ai => {
+          if (!ai) throw new Error('no key');
+          // Gemini leaves make and model empty when there's no vehicle in the picture
+          if (!String(ai.make || '').trim() && !String(ai.model || '').trim()) {
+            const e = new Error('No car found in frame'); e.noCar = true; throw e;
+          }
+          gotDetails = true;
+          scan.year = ai.year || '';
+          scan.make = ai.make || '';
+          scan.model = ai.model || '';
+          scan.trim = ai.trim || '';
+          scan.plate = ai.plate || '';
+          if (ai.color) scan.paint = { hex: ai.colorHex || scan.paint.hex, name: ai.color };
+          scan.value = ai.value;
+          $('lock-status').textContent = `Saved — ${scanPrompt().toLowerCase()} the next car`;
+        }).catch((err) => {
+          $('lock-status').textContent = (err && err.noCar)
+            ? `No car found in frame — ${scanPrompt().toLowerCase()} again`
+            : `AI check failed (${(err && err.message) || 'check API key'}) — ${scanPrompt().toLowerCase()} again`;
+        }).finally(() => {
+          scan.aiPending = false;
+          setResultsWaiting(false);
+          clearTimeout(thinkTimer);   // a fast answer/failure must not start the processing blips afterwards
+          // Only show and save a card when we actually got the car's details
+          if (gotDetails) {
+            renderResults(scan);
+            saveOrUpdateHistory({ ...scan });
+            openDetails(false);   // camera stays off until "Back to scan"
+            sfx.success();
+          } else {
+            sfx.error();
+          }
+          endScanFx();
+          purgePhotoAndWait();
+        });
+      } else {
+        $('lock-status').textContent = `Saved — ${scanPrompt().toLowerCase()} the next car`;
+        setTimeout(() => sfx.success(), 150);
+        endScanFx();
+        purgePhotoAndWait();
+      }
+    }
+
+    function startHoldScan() {
+      const hasPhoto = Boolean($('ar-photo').getAttribute('src'));
+      if (!state.cameraReady && !hasPhoto) return;
+      if (state.holding) return;
+      // Still getting the last car's details (camera paused) or History is open: don't start another scan.
+      if (livePauseReasons.size) return;
+      // Live camera: only scan when the green box is around a car.
+      // (If the car detector couldn't load at all, don't lock the user out; the AI's "no car" check still applies.)
+      if (state.cameraReady && !state.cocoFailed && !$('viewfinder').classList.contains('locked')) {
+        $('lock-status').textContent = state.cocoModel
+          ? 'No car in view — point at a car until the green box appears'
+          : 'Starting car detector… one moment';
+        sfx.denied();
+        return;
+      }
+      state.holding = true;
+      state.decodedVin = null;
+      $('scan-status-pill').textContent = 'SCANNING...';
+      $('lock-status').textContent = 'Scanning…';
+      setScanningFx(true, 'SCANNING');
+
+      const start = performance.now();
+      const duration = 750;
+      sfx.scanStart(duration);
+      function tick(now) {
+        if (!state.holding) return;
+        const pct = Math.min(100, ((now - start) / duration) * 100);
+        $('scan-progress-fill').style.width = pct + '%';
+        if (pct >= 100) {
+          state.holding = false;
+          executeScan(state.cameraReady ? $('ar-video') : $('ar-photo'));
+          return;
+        }
+        state.holdRaf = requestAnimationFrame(tick);
+      }
+      state.holdRaf = requestAnimationFrame(tick);
+    }
+
+    function stopHoldScan() {
+      if (!state.holding) return;
+      state.holding = false;
+      if (state.holdRaf) cancelAnimationFrame(state.holdRaf);
+      sfx.scanStop();
+      $('scan-progress-fill').style.width = '0%';
+      $('scan-status-pill').textContent = state.cameraReady ? 'AR LIVE' : 'PHOTO READY';
+      setScanningFx(false);
+      $('lock-status').textContent = 'Hold to scan — keep holding until the bar fills';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initHiddenCamera();
+
+      // Load saved history
+      try {
+        const savedHist = JSON.parse(localStorage.getItem('waink_scan_history_v1') || '[]');
+        if (Array.isArray(savedHist)) state.history = savedHist;
+      } catch (_) {}
+      renderHistory();
+
+      // Tab switching (Scanner | History)
+      let currentTab = 'scanner';
+      function updateSwipeDots() {
+        const isScan = currentTab === 'scanner';
+        document.querySelectorAll('.swipe-dot').forEach(d => d.classList.toggle('on', d.dataset.dot === currentTab));
+        $('swipe-label').textContent = isScan ? 'Scanner' : `History (${state.history.length})`;
+        $('swipe-hint').textContent = isScan ? 'swipe ← history' : 'swipe → scanner';
+      }
+      function showTab(tab, animate) {
+        const isScan = tab === 'scanner';
+        const changed = tab !== currentTab;
+        currentTab = tab;
+        updateSwipeDots();
+        if (animate && changed) {
+          const panel = isScan ? $('panel-scanner') : $('panel-history');
+          panel.classList.remove('slide-from-right', 'slide-from-left');
+          void panel.offsetWidth; // restart the animation
+          panel.classList.add(isScan ? 'slide-from-left' : 'slide-from-right');
+        }
+        // Live camera only runs while the Scanner is showing
+        if (isScan) resumeLive('history'); else pauseLive('history');
+        if (isScan) {
+          $('panel-scanner').classList.remove('hidden');
+          $('panel-history').classList.add('hidden');
+        } else {
+          $('panel-scanner').classList.add('hidden');
+          $('panel-history').classList.remove('hidden');
+          renderHistory();
+        }
+        $('tab-btn-scanner').className = isScan
+          ? 'px-3 py-1 rounded-full text-[11px] font-bold bg-gradient-to-r from-cyan-500/30 to-pink-500/30 text-white border border-cyan-400/40 transition'
+          : 'px-3 py-1 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition';
+        $('tab-btn-history').className = !isScan
+          ? 'px-3 py-1 rounded-full text-[11px] font-bold bg-gradient-to-r from-cyan-500/30 to-pink-500/30 text-white border border-cyan-400/40 transition'
+          : 'px-3 py-1 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition';
+      }
+      $('tab-btn-scanner').addEventListener('click', () => showTab('scanner', true));
+      $('tab-btn-history').addEventListener('click', () => showTab('history', true));
+      updateSwipeDots();
+
+      // Details pop-up: ×, the dark backdrop, "Back to scan/history" and Esc all close it.
+      document.querySelectorAll('[data-close-details]').forEach(el => el.addEventListener('click', closeDetails));
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && detailsOpen()) closeDetails(); });
+
+      // If the phone wanted a tap before giving the camera back, tapping the camera window retries.
+      $('viewfinder').addEventListener('click', () => {
+        if (state.needsCameraTap && !livePauseReasons.size) { state.needsCameraTap = false; reopenCamera(); }
+      });
+
+      // Swipe left on the scanner card for History, right to go back to the Scanner.
+      (function setupSwipe() {
+        const card = $('scanner-card');
+        let sx = 0, sy = 0, st = 0, tracking = false;
+        card.addEventListener('touchstart', (e) => {
+          tracking = false;
+          if (e.touches.length !== 1 || state.holding) return;
+          // Don't treat the hold-to-scan button or text boxes as swipes.
+          if (e.target.closest('#btn-scan, #real-photo-input, input, textarea, select')) return;
+          sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); tracking = true;
+        }, { passive: true });
+        card.addEventListener('touchend', (e) => {
+          if (!tracking) return;
+          tracking = false;
+          const t = e.changedTouches[0];
+          const dx = t.clientX - sx, dy = t.clientY - sy;
+          if (Date.now() - st > 900 || Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          if (dx < 0 && currentTab === 'scanner') showTab('history', true);
+          else if (dx > 0 && currentTab === 'history') showTab('scanner', true);
+        }, { passive: true });
+        card.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+        // Tapping the dots also works.
+        document.querySelectorAll('.swipe-dot').forEach(d => d.addEventListener('click', () => showTab(d.dataset.dot, true)));
+      })();
+
+      $('btn-clear-history').addEventListener('click', () => {
+        state.history = [];
+        persistHistory();
+        renderHistory();
+      });
+
+      $('history-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('.hist-view-btn');
+        if (!btn) return;
+        const item = state.history[Number(btn.dataset.histIdx)];
+        if (!item) return;
+        renderResults(item);
+        openDetails(true);   // stays on History underneath; camera stays off
+      });
+
+      function handleCapturedFile(file) {
+        if (!file) return;
+        state.decodedVin = null;
+        state.lastDetections = [];
+        $('scan-status-pill').textContent = 'SCANNING...';
+        $('lock-status').textContent = 'Scanning captured vehicle...';
+        $('scan-progress-fill').style.width = '50%';
+        sfx.scanStart(650);
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            const sw = img.naturalWidth || 640;
+            const sh = img.naturalHeight || 480;
+            const scale = Math.min(1, 1600 / Math.max(sw, sh));
+            c.width = Math.max(1, Math.round(sw * scale));
+            c.height = Math.max(1, Math.round(sh * scale));
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            // Show the photo in the viewfinder with the scanning animation over it.
+            try {
+              $('vf-still').src = c.toDataURL('image/jpeg', 0.8);
+              $('viewfinder').classList.add('has-still');
+              $('vf-mode').textContent = 'PHOTO';
+            } catch (_) {}
+            setScanningFx(true, 'SCANNING');
+            setTimeout(() => executeScan(c), 650);
+          };
+          img.onerror = () => {
+            setScanningFx(false);
+            $('scan-status-pill').textContent = 'READY';
+            $('scan-progress-fill').style.width = '0%';
+            $('lock-status').textContent = 'Could not read photo — try again';
+          };
+          img.src = reader.result;
+        };
+        reader.onloadend = () => {
+          const inp = $('real-photo-input');
+          if (inp) inp.value = '';
+        };
+        reader.readAsDataURL(file);
+      }
+
+      $('real-photo-input').addEventListener('change', (e) => {
+        const inputEl = e.target;
+        const file = inputEl.files && inputEl.files[0];
+        if (file) handleCapturedFile(file);
+      });
+
+      const scanBtn = $('btn-scan');
+      scanBtn.addEventListener('mousedown', () => {
+        if (state.cameraReady) startHoldScan();
+      });
+      scanBtn.addEventListener('touchstart', (e) => {
+        if (state.cameraReady) {
+          e.preventDefault();
+          startHoldScan();
+        }
+      }, { passive: false });
+      window.addEventListener('mouseup', stopHoldScan);
+      window.addEventListener('touchend', stopHoldScan);
+
+      window.addEventListener('keydown', (e) => {
+        if (document.activeElement && ['INPUT'].includes(document.activeElement.tagName)) return;
+        if (e.code === 'Space' || e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          if (!e.repeat) startHoldScan();
+        }
+      });
+      window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space' || e.key.toLowerCase() === 'r') stopHoldScan();
+      });
+
+
+
+      // Settings modal
+      $('btn-settings').addEventListener('click', () => $('settings-modal').classList.remove('hidden'));
+      $('btn-close-settings').addEventListener('click', () => $('settings-modal').classList.add('hidden'));
+      $('settings-modal').addEventListener('click', (e) => {
+        if (e.target === $('settings-modal')) $('settings-modal').classList.add('hidden');
+      });
+
+      // A key saved in Settings overrides the built-in one. The built-in key is never shown in the input.
+      let savedKey = '';
+      try { savedKey = localStorage.getItem('waink_gemini_key_v1') || ''; } catch (_) {}
+      if (savedKey) {
+        state.apiKey = savedKey;
+        $('gemini-key-input').value = savedKey;
+        $('ai-key-status').textContent = 'AI Car & Plate Guesser active (your saved key).';
+        $('ai-key-status').className = 'text-[11px] text-emerald-300';
+      } else if (state.apiKey) {
+        $('ai-key-status').textContent = 'AI Car & Plate Guesser active (built-in key).';
+        $('ai-key-status').className = 'text-[11px] text-emerald-300';
+      }
+
+      $('btn-save-gemini-key').addEventListener('click', () => {
+        const val = $('gemini-key-input').value.trim();
+        state.apiKey = val || BUILT_IN_GEMINI_KEY;
+        try {
+          if (val) {
+            localStorage.setItem('waink_gemini_key_v1', val);
+            $('ai-key-status').textContent = 'Key saved on device!';
+            $('ai-key-status').className = 'text-[11px] text-emerald-300';
+          } else {
+            localStorage.removeItem('waink_gemini_key_v1');
+            $('ai-key-status').textContent = BUILT_IN_GEMINI_KEY ? 'Saved key cleared — using built-in key.' : 'Key cleared.';
+            $('ai-key-status').className = 'text-[11px] text-slate-400';
+          }
+        } catch (_) {}
+      });
+
+      $('btn-decode-vin').addEventListener('click', async () => {
+        const vin = $('vin-input').value.trim().toUpperCase();
+        const statusEl = $('vin-status');
+        statusEl.classList.remove('hidden');
+        if (vin.length !== 17) {
+          statusEl.textContent = 'Enter a valid 17-character VIN.';
+          statusEl.className = 'text-[11px] text-amber-300';
+          return;
+        }
+        statusEl.textContent = 'Decoding VIN...';
+        try {
+          const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(vin)}?format=json`);
+          const data = await res.json();
+          const r = data?.Results?.[0];
+          if (!r || !r.Make) {
+            statusEl.textContent = 'Could not decode VIN.';
+            statusEl.className = 'text-[11px] text-rose-300';
+            return;
+          }
+          state.decodedVin = {
+            body: r.BodyClass || '',
+            drive: r.DriveType || '',
+            engine: [r.EngineCylinders ? r.EngineCylinders + ' cyl' : '', r.DisplacementL ? Number(r.DisplacementL).toFixed(1) + 'L' : ''].filter(Boolean).join(' '),
+            fuel: r.FuelTypePrimary || ''
+          };
+          statusEl.textContent = `Decoded: ${r.ModelYear} ${r.Make} ${r.Model}`;
+          statusEl.className = 'text-[11px] text-emerald-300';
+          $('settings-modal').classList.add('hidden');
+          renderResults({
+            title: `${r.ModelYear} ${r.Make} ${r.Model}`,
+            gtaClass: r.BodyClass || 'Vehicle',
+            year: r.ModelYear || '',
+            make: r.Make || '',
+            model: r.Model || '',
+            trim: '',
+            plate: '',
+            paint: { hex: '#38bdf8', name: 'VIN Decoded' },
+            sell: 6850,
+            reg: 22400,
+            access: 'Keyless (Key Cloner)',
+            tracker: 'Standard',
+            conf: 100
+          });
+          openDetails(false);
+        } catch (_) {
+          statusEl.textContent = 'VIN lookup failed.';
+          statusEl.className = 'text-[11px] text-rose-300';
+        }
+      });
+
+      // Sound effects toggle (remembered on this device)
+      try { if (localStorage.getItem('waink_sfx_v1') === 'off') state.soundEnabled = false; } catch (_) {}
+      $('btn-sound').textContent = state.soundEnabled ? 'SFX: On' : 'SFX: Off';
+      $('btn-sound').addEventListener('click', () => {
+        state.soundEnabled = !state.soundEnabled;
+        $('btn-sound').textContent = state.soundEnabled ? 'SFX: On' : 'SFX: Off';
+        try { localStorage.setItem('waink_sfx_v1', state.soundEnabled ? 'on' : 'off'); } catch (_) {}
+        if (!state.soundEnabled) sfx.stopAll();
+        else { unlockAudio(); sfx.success(); }   // quick preview so you know it's on
+      });
+
+      // PWA Manifest
+      const iconBase = location.origin + '/icons/';
+      try {
+        const manifestObj = {
+          name: 'WAiNK',
+          short_name: 'WAiNK',
+          start_url: location.origin + '/',
+          display: 'standalone',
+          background_color: '#100f1f',
+          theme_color: '#100f1f',
+          icons: [
+            { src: iconBase + 'icon-192.png?v=4', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: iconBase + 'icon-512.png?v=4', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: iconBase + 'icon-maskable-512.png?v=4', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+          ]
+        };
+        const blob = new Blob([JSON.stringify(manifestObj)], { type: 'application/manifest+json' });
+        $('pwa-manifest').setAttribute('href', URL.createObjectURL(blob));
+      } catch (_) {}
+
+      let deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        $('native-install-wrap').classList.remove('hidden');
+      });
+      $('btn-native-install').addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        $('native-install-wrap').classList.add('hidden');
+      });
+    });
+  </script>
+</body>
+</html>

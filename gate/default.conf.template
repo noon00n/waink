@@ -1,0 +1,72 @@
+# WAiNK passcode gate (template). scripts/install-gate.sh fills in __PASSCODE_REGEX__, __AUTH_TOKEN__ and __DOMAIN__.
+map_hash_bucket_size 128;
+limit_req_zone $http_cf_connecting_ip zone=wklogin:1m rate=10r/m;
+
+map $http_x_passcode $wk_pass_ok {
+    default 0;
+    "__PASSCODE_REGEX__" 1;
+}
+map $wk_pass_ok $wk_login_target {
+    default /__login_bad;
+    1 /__login_ok;
+}
+map $cookie_wk_auth $wk_authed {
+    default 0;
+    "__AUTH_TOKEN__" 1;
+}
+
+server {
+    listen 127.0.0.1:30607;
+    server_name __DOMAIN__ www.__DOMAIN__;
+    client_max_body_size 1m;
+
+    if ($host = "www.__DOMAIN__") { return 301 https://__DOMAIN__$request_uri; }
+    if ($http_x_forwarded_proto = "http") { return 301 https://$host$request_uri; }
+    if ($http_cf_visitor ~* "\"scheme\":\"http\"") { return 301 https://$host$request_uri; }
+
+    location = /__login {
+        limit_req zone=wklogin burst=5 nodelay;
+        limit_req_status 429;
+        root /etc/nginx/gate;
+        # try_files runs after the rate limit, so wrong guesses are throttled too
+        try_files /__no_such_file__ $wk_login_target;
+    }
+
+    location = /__login_ok {
+        internal;
+        add_header Set-Cookie "wk_auth=__AUTH_TOKEN__; Max-Age=34560000; Path=/; Secure; HttpOnly; SameSite=Lax" always;
+        add_header Cache-Control "no-store" always;
+        return 204;
+    }
+
+    location = /__login_bad {
+        internal;
+        return 403;
+    }
+
+    location = /__gate.html {
+        internal;
+        root /etc/nginx/gate;
+        add_header Cache-Control "no-store" always;
+        add_header X-Frame-Options "DENY" always;
+    }
+
+    # App icons are not secret; phones fetch them for the home screen before/without the login cookie.
+    location ^~ /icons/ {
+        proxy_pass http://127.0.0.1:30606;
+        proxy_set_header Host $host;
+        proxy_set_header Cookie "";
+        add_header Cache-Control "public, max-age=86400" always;
+    }
+
+    location / {
+        if ($wk_authed = 0) { rewrite ^ /__gate.html last; }
+        add_header Set-Cookie "wk_auth=__AUTH_TOKEN__; Max-Age=34560000; Path=/; Secure; HttpOnly; SameSite=Lax" always;
+        add_header Cache-Control "no-store" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "no-referrer" always;
+        proxy_pass http://127.0.0.1:30606;
+        proxy_set_header Host $host;
+        proxy_set_header Cookie "";
+    }
+}

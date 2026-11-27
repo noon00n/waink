@@ -1,0 +1,16 @@
+# Secrets - never commit these
+.env
+*.env
+secrets/
+# Built copies of the app with the real Gemini key filled in
+dist/
+# Cloudflare tunnel credentials / login certificate
+cloudflared/*.json
+cloudflared/cert.pem
+# Generated gate config (contains the passcode and login token)
+gate/default.conf
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
