@@ -45,10 +45,12 @@ docker-compose.yml       nginx container serving app/ on port 30606
 - **Never commit a real Gemini key.** `app/index.html` only contains `__GEMINI_KEY__`.
 - Anyone who gets past the passcode can read the key in the page source — keep the passcode private and use a
   separate free-tier key for this app.
-- The tunnel exposes only the passcode gate; nothing else on the server is reachable from the internet.
+- The tunnel exposes only the passcode gate; nothing else on the server is reachable from the internet. (allegedly)
 
 ## Notes
 
 - iPhone sounds follow the ringer switch (silent = muted) and mix with music.
-- Camera permission: set the site to **Allow** in Safari's website settings so it isn't asked every time.
+- Camera permission: set the site to **Allow** in Safari's website settings so it isn't asked every time. (Beware other websites that might try to use your camera)
 - "Sim" values (access, tracker, sell/register) are game flavor; the market value is an AI estimate, not an official Kelley Blue Book price.
+
+Vibe Coded With Claude
